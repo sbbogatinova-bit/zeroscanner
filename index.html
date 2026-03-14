@@ -3,36 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ZeroPlastic - Pro Scanner</title>
+    <title>ZeroPlastic Pro - Final Fix</title>
     <script src="https://unpkg.com/@zxing/library@latest"></script>
     <style>
-        :root { --green: #2ecc71; --dark: #111; }
-        body { font-family: sans-serif; background: var(--dark); color: white; margin: 0; padding: 10px; text-align: center; overflow: hidden; }
+        :root { --green: #2ecc71; --dark: #111; --gold: #f1c40f; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--dark); color: white; margin: 0; padding: 10px; text-align: center; }
         .container { max-width: 450px; margin: auto; }
         
         #video-container { 
-            position: relative; width: 100%; height: 380px; border-radius: 25px; 
+            position: relative; width: 100%; height: 320px; border-radius: 25px; 
             overflow: hidden; border: 4px solid var(--green); background: #000;
         }
         video { width: 100%; height: 100%; object-fit: cover; }
         
         .guide-box {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 260px; height: 160px; border: 3px solid #fff;
+            width: 240px; height: 140px; border: 3px solid #fff;
             border-radius: 15px; box-shadow: 0 0 0 1000px rgba(0,0,0,0.6);
         }
-        .laser { position: absolute; width: 100%; height: 2px; background: #00ff00; top: 50%; animation: scan 2s infinite; box-shadow: 0 0 10px #00ff00; }
+        .laser { position: absolute; width: 100%; height: 2px; background: #00ff00; top: 50%; animation: scan 2s infinite; }
         @keyframes scan { 0%, 100% { top: 10%; } 50% { top: 90%; } }
 
-        .controls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
-        .btn { padding: 18px 0; border: none; border-radius: 15px; background: var(--green); color: white; font-weight: bold; font-size: 1.3rem; box-shadow: 0 4px 0 #27ae60; }
-        .btn:active { transform: translateY(2px); box-shadow: none; }
+        .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 15px 0; }
+        .btn { padding: 15px 0; border: none; border-radius: 12px; background: var(--green); color: white; font-weight: bold; font-size: 1.3rem; box-shadow: 0 4px 0 #27ae60; }
         
-        #msg-box { 
-            position: fixed; top: 20px; left: 50%; transform: translateX(-50%); 
-            background: #fff; color: #000; padding: 15px; border-radius: 15px; 
-            width: 80%; display: none; z-index: 100; font-weight: bold;
-        }
+        .map-btn { width: 100%; padding: 15px; background: var(--gold); color: #000; border: none; border-radius: 15px; font-weight: bold; font-size: 1rem; cursor: pointer; margin-bottom: 15px; }
+        
+        #status-msg { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #fff; color: #000; padding: 15px; border-radius: 15px; width: 80%; display: none; z-index: 100; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
     </style>
 </head>
 <body>
@@ -43,132 +40,95 @@
         <button onclick="toggleFlash()" style="background:#444; color:white; border:none; padding:10px 15px; border-radius:10px;">Фенер 🔦</button>
     </div>
 
-    <div id="video-container" onclick="requestLockFocus()">
+    <div id="video-container">
         <video id="video" playsinline></video>
         <div class="guide-box"><div class="laser"></div></div>
     </div>
 
-    <p style="font-size:0.9rem; color:#888; margin:15px 0;">Ако е размазано, отдалечи на 25-30 см.</p>
+    <p style="font-size:0.8rem; color:#888; margin:10px 0;">Дръж баркода на 25 см от камерата</p>
 
-    <div class="controls">
-        <button class="btn" onclick="tap(1)">1</button>
-        <button class="btn" onclick="tap(2)">2</button>
-        <button class="btn" onclick="tap(3)">3</button>
-        <button class="btn" onclick="tap(4)">4</button>
-        <button class="btn" onclick="tap(5)">5</button>
-        <button class="btn" onclick="tap(6)">6</button>
-        <button class="btn" onclick="tap(7)">7</button>
-        <button class="btn" style="background:#555; box-shadow:0 4px 0 #333;" onclick="tap('?')">?</button>
+    <div class="grid">
+        <button class="btn" onclick="manual(1)">1</button>
+        <button class="btn" onclick="manual(2)">2</button>
+        <button class="btn" onclick="manual(3)">3</button>
+        <button class="btn" onclick="manual(4)">4</button>
+        <button class="btn" onclick="manual(5)">5</button>
+        <button class="btn" onclick="manual(6)">6</button>
+        <button class="btn" onclick="manual(7)">7</button>
+        <button class="btn" style="background:#555; box-shadow:0 4px 0 #333;" onclick="manual('?')">?</button>
     </div>
+
+    <button class="map-btn" onclick="window.open('https://www.google.com/maps/search/recycling+center')">📍 ПУНКТОВЕ ЗА РЕЦИКЛИРАНЕ</button>
 </div>
 
-<div id="msg-box" onclick="this.style.display='none'"></div>
+<div id="status-msg"></div>
 
 <script>
     const codeReader = new ZXing.BrowserMultiFormatReader();
     const video = document.getElementById('video');
     let videoTrack = null;
-    let lastScan = 0;
+    let lastScannedCode = null;
+    let lastScanTime = 0;
 
-    async function init() {
-        const constraints = {
-            video: { 
-                facingMode: { exact: "environment" }, // Настояваме за задна камера
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            }
-        };
-
+    async function start() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "environment", width: { ideal: 1280 } } 
+            });
             video.srcObject = stream;
             videoTrack = stream.getVideoTracks()[0];
             
-            // Стартиране на ZXing скенера
+            // Автоматично ре-фокусиране на всеки 2.5 секунди за телефони
+            setInterval(() => {
+                if (videoTrack && videoTrack.applyConstraints) {
+                    videoTrack.applyConstraints({ advanced: [{ focusMode: "continuous" }] }).catch(() => {});
+                }
+            }, 2500);
+
             codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
                 if (result) {
                     const now = Date.now();
-                    if (now - lastScan > 3000) { // Сканира само веднъж на 3 секунди
-                        lastScan = now;
-                        onScanSuccess(result.text);
+                    // Защита: не трупай точки, ако е същият код или са минали по-малко от 10 сек
+                    if (result.text !== lastScannedCode || (now - lastScanTime > 10000)) {
+                        lastScannedCode = result.text;
+                        lastScanTime = now;
+                        onSuccess("БАРКОД РАЗПОЗНАТ! ✨", 5);
                     }
                 }
             });
-            
-            setTimeout(requestLockFocus, 1000); // Опит за автоматичен фокус
-
         } catch (e) {
-            // Ако няма камера с "exact" environment (напр. лаптоп), пробваме нормално
-            navigator.mediaDevices.getUserMedia({ video: true }).then(s => {
-                video.srcObject = s;
-                videoTrack = s.getVideoTracks()[0];
-            });
+            navigator.mediaDevices.getUserMedia({ video: true }).then(s => { video.srcObject = s; });
         }
-        updateScore();
+        updateUI();
     }
 
-    function requestLockFocus() {
-        if (videoTrack && videoTrack.applyConstraints) {
-            // Настройки за максимален фокус
-            videoTrack.applyConstraints({
-                advanced: [
-                    { focusMode: "continuous" },
-                    { exposureMode: "continuous" },
-                    { whiteBalanceMode: "continuous" }
-                ]
-            }).catch(() => console.log("Focus constraints rejected"));
-        }
-    }
-
-    function onScanSuccess(data) {
+    function onSuccess(msg, p) {
+        beep();
         if (navigator.vibrate) navigator.vibrate(200);
-        showMsg("БАРКОД РАЗПОЗНАТ! ✨<br>Сега избери цифрата на пластмасата за бонус точки.");
-        addPts(5);
-    }
-
-    function tap(code) {
-        if (navigator.vibrate) navigator.vibrate(50);
-        const info = {
-            1: "PET (1): Бутилки за вода/сок.",
-            2: "HDPE (2): Козметика и мляко.",
-            3: "PVC (3): Вредно! Не рециклирай.",
-            4: "LDPE (4): Найлонови торбички.",
-            5: "PP (5): Кутии за храна.",
-            6: "PS (6): Стиропор.",
-            7: "OTHER (7): Смесена.",
-            '?': "Непозната пластмаса."
-        };
-        showMsg(`ЗАПИСАНО: ${info[code]} <br>+10 точки!`);
-        addPts(10);
-    }
-
-    function showMsg(html) {
-        const box = document.getElementById('msg-box');
-        box.innerHTML = html;
+        const box = document.getElementById('status-msg');
+        box.innerHTML = `<b>${msg}</b><br>+${p} точки`;
         box.style.display = 'block';
-        setTimeout(() => box.style.display = 'none', 4000);
+        addPoints(p);
+        setTimeout(() => { box.style.display = 'none'; }, 3000);
     }
 
-    function addPts(n) {
+    function manual(code) {
+        onSuccess(`ЗАПИСАНО: Пластмаса тип ${code}`, 10);
+    }
+
+    function addPoints(n) {
         let p = parseInt(localStorage.getItem('eco_pts') || "0") + n;
         localStorage.setItem('eco_pts', p);
-        updateScore();
+        updateUI();
     }
 
-    function updateScore() {
+    function updateUI() {
         document.getElementById('pts').innerText = localStorage.getItem('eco_pts') || "0";
     }
 
-    function toggleFlash() {
-        if (videoTrack) {
-            const caps = videoTrack.getCapabilities();
-            if (caps.torch) {
-                videoTrack.applyConstraints({ advanced: [{ torch: !videoTrack.getSettings().torch }] });
-            }
-        }
-    }
-
-    window.onload = init;
-</script>
-</body>
-</html>
+    function beep() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const o = ctx.createOscillator();
+            o.connect(ctx.destination);
+            o.start(); o.stop(ctx.currentTime +
