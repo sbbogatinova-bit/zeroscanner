@@ -60,4 +60,131 @@
         <button class="code-btn" onclick="processSelection(1)">1</button>
         <button class="code-btn" onclick="processSelection(2)">2</button>
         <button class="code-btn" onclick="processSelection(3)">3</button>
-        <button class="code-btn" onclick
+        <button class="code-btn" onclick="processSelection(4)">4</button>
+        <button class="code-btn" onclick="processSelection(5)">5</button>
+        <button class="code-btn" onclick="processSelection(6)">6</button>
+        <button class="code-btn" onclick="processSelection(7)">7</button>
+        <button class="code-btn" style="background:#718096" onclick="processSelection('?')">?</button>
+    </div>
+
+    <button class="loc-btn" onclick="findRecyclePoints()">📍 Намери пункт за рециклиране</button>
+
+    <div id="result"></div>
+
+    <div id="history">
+        <h4 style="margin-bottom: 10px; color: #4a5568;">📜 Твоят Еко Дневник</h4>
+        <div id="history-list"></div>
+    </div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const pointsDisplay = document.getElementById('total-points');
+    const rankDisplay = document.getElementById('user-rank');
+
+    const plasticData = {
+        1: { name: "PET", info: "Бутилки за вода. Рециклирай!", color: "#38a169" },
+        2: { name: "HDPE", info: "Препарати/Козметика. Безопасна.", color: "#38a169" },
+        3: { name: "PVC", info: "ОПАСНА! Избягвай за храна.", color: "#e53e3e" },
+        4: { name: "LDPE", info: "Торбички и фолио. Рециклирай.", color: "#38a169" },
+        5: { name: "PP", info: "Кутии за храна. Безопасна.", color: "#38a169" },
+        6: { name: "PS", info: "Стиропор. Вредна при загряване.", color: "#dd6b20" },
+        7: { name: "OTHER", info: "Смесени пластмаси. Трудни за рециклиране.", color: "#718096" },
+        '?': { name: "Без код", info: "Бъди внимателен с този обект.", color: "#718096" }
+    };
+
+    // ЗВУКОВ СИГНАЛ
+    function playBeep() {
+        try {
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.frequency.value = 880;
+            gain.gain.value = 0.05;
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        } catch(e) {}
+    }
+
+    // ИНИЦИАЛИЗАЦИЯ
+    async function initCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: { ideal: "environment" } } 
+            });
+            video.srcObject = stream;
+            video.setAttribute("playsinline", true);
+            video.play();
+        } catch (err) { alert("Моля, разрешете камерата."); }
+        renderUI();
+    }
+
+    // ДЕЙСТВИЕ ПРИ СКАН
+    function processSelection(code) {
+        playBeep();
+        const item = plasticData[code];
+        
+        // СНИМКА
+        const ctx = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+        const imgData = canvas.toDataURL('image/png');
+
+        // ТОЧКИ
+        let pts = parseInt(localStorage.getItem('eco_pts') || "0") + 10;
+        localStorage.setItem('eco_pts', pts);
+
+        // ИНФО
+        const resDiv = document.getElementById('result');
+        resDiv.style.display = "block";
+        resDiv.style.borderLeftColor = item.color;
+        resDiv.innerHTML = `<strong>Код ${code} (${item.name}):</strong><br>${item.info}<br><span style="color:green; font-size:12px;">+10 точки!</span>`;
+
+        // ЛОГ
+        let logs = JSON.parse(localStorage.getItem('eco_logs') || "[]");
+        logs.unshift({ name: item.name, img: imgData, date: new Date().toLocaleTimeString('bg-BG') });
+        localStorage.setItem('eco_logs', JSON.stringify(logs.slice(0, 5)));
+
+        renderUI();
+    }
+
+    function renderUI() {
+        const pts = parseInt(localStorage.getItem('eco_pts') || "0");
+        pointsDisplay.innerText = pts;
+        
+        let rank = "Еко Начинаещ";
+        if (pts >= 100) rank = "Зелен Пазител";
+        if (pts >= 300) rank = "Пластмасов Борец";
+        if (pts >= 1000) rank = "Еко Герой 🏆";
+        rankDisplay.innerText = rank;
+
+        const logs = JSON.parse(localStorage.getItem('eco_logs') || "[]");
+        document.getElementById('history-list').innerHTML = logs.map(l => `
+            <div class="history-item">
+                <img src="${l.img}">
+                <div><strong>${l.name}</strong><br><small>${l.date}</small></div>
+            </div>
+        `).join('');
+    }
+
+    function findRecyclePoints() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(p => {
+                window.open(`https://www.google.com/maps/search/recycling+center/@${p.coords.latitude},${p.coords.longitude},14z`);
+            }, () => {
+                window.open('https://www.google.com/maps/search/recycling+center');
+            });
+        }
+    }
+
+    window.onload = initCamera;
+</script>
+
+</body>
+</html>
