@@ -3,81 +3,211 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ZeroPlastic Scanner</title>
+    <title>ZeroPlastic Scanner - Full Version</title>
     <style>
-        :root { --green: #2c7a7b; }
-        body { font-family: sans-serif; text-align: center; background: #f0f4f8; margin: 0; padding: 15px; }
-        .container { max-width: 450px; margin: auto; background: white; padding: 20px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
-        #video-container { position: relative; width: 100%; max-width: 320px; margin: auto; border-radius: 15px; overflow: hidden; background: #000; border: 4px solid var(--green); }
+        :root {
+            --green: #2c7a7b;
+            --blue: #3182ce;
+        }
+        body {
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            text-align: center;
+            background: #f0f4f8;
+            margin: 0;
+            padding: 15px;
+        }
+        .container {
+            max-width: 450px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        /* Статистика */
+        .stats-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--green);
+            color: white;
+            padding: 12px 18px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+        }
+        #video-container {
+            position: relative;
+            width: 100%;
+            max-width: 320px;
+            margin: auto;
+            border-radius: 20px;
+            overflow: hidden;
+            background: #000;
+            border: 4px solid var(--green);
+        }
         video { width: 100%; display: block; }
-        #overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 160px; height: 160px; border: 2px solid #fff; box-shadow: 0 0 0 500px rgba(0,0,0,0.5); border-radius: 10px; pointer-events: none; }
-        .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 20px; }
-        button { padding: 15px 5px; border: none; border-radius: 10px; background: var(--green); color: white; font-weight: bold; cursor: pointer; }
-        #result { margin-top: 20px; padding: 15px; border-radius: 10px; display: none; background: #f9fafb; border-left: 5px solid var(--green); text-align: left; }
+        #overlay {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 150px; height: 150px;
+            border: 2px solid white;
+            box-shadow: 0 0 0 500px rgba(0,0,0,0.5);
+            border-radius: 10px;
+            pointer-events: none;
+        }
+        /* Бутони */
+        .grid {
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 10px; margin: 15px 0;
+        }
+        .code-btn {
+            padding: 15px 5px; border: none; border-radius: 10px;
+            background: var(--green); color: white;
+            font-weight: bold; cursor: pointer; font-size: 16px;
+        }
+        .loc-btn {
+            width: 100%; padding: 15px; background: var(--blue);
+            color: white; border: none; border-radius: 12px;
+            font-size: 16px; font-weight: bold; margin-bottom: 15px;
+        }
+        /* Резултат и Дневник */
+        #result {
+            margin-top: 15px; padding: 15px; border-radius: 15px;
+            display: none; background: #f9fafb; text-align: left;
+            border-left: 6px solid var(--green);
+        }
+        .history-item {
+            display: flex; align-items: center; background: white;
+            padding: 10px; border-radius: 12px; margin-bottom: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .history-item img {
+            width: 50px; height: 50px; border-radius: 8px;
+            object-fit: cover; margin-right: 12px;
+        }
+        canvas { display: none; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>♻️ ZeroPlastic</h2>
+    <div class="stats-bar">
+        <div style="font-size: 18px;">🌟 <span id="total-points">0</span> т.</div>
+        <div id="user-rank" style="font-size: 14px; opacity: 0.9;">Еко Начинаещ</div>
+    </div>
+
     <div id="video-container">
         <video id="video" autoplay playsinline muted></video>
         <div id="overlay"></div>
     </div>
 
     <div class="grid">
-        <button onclick="check(1)">1</button>
-        <button onclick="check(2)">2</button>
-        <button onclick="check(3)">3</button>
-        <button onclick="check(4)">4</button>
-        <button onclick="check(5)">5</button>
-        <button onclick="check(6)">6</button>
-        <button onclick="check(7)">7</button>
-        <button style="background:#718096" onclick="check('?')">?</button>
+        <button class="code-btn" onclick="handleScan(1)">1</button>
+        <button class="code-btn" onclick="handleScan(2)">2</button>
+        <button class="code-btn" onclick="handleScan(3)">3</button>
+        <button class="code-btn" onclick="handleScan(4)">4</button>
+        <button class="code-btn" onclick="handleScan(5)">5</button>
+        <button class="code-btn" onclick="handleScan(6)">6</button>
+        <button class="code-btn" onclick="handleScan(7)">7</button>
+        <button class="code-btn" style="background:#718096" onclick="handleScan('?')">?</button>
     </div>
 
+    <button class="loc-btn" onclick="openMap()">📍 Намери пункт за рециклиране</button>
+
     <div id="result"></div>
+
+    <div style="text-align: left; margin-top: 20px;">
+        <h4>📜 Дневник на събирача</h4>
+        <div id="history-list"></div>
+    </div>
 </div>
+
+<canvas id="canvas"></canvas>
 
 <script>
     const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
 
-    // ФУНКЦИЯ ЗА СТАРТИРАНЕ НА КАМЕРАТА (ОПТИМИЗИРАНА ЗА ТЕЛЕФОН)
-    async function initCamera() {
-        const constraints = {
-            video: { facingMode: { ideal: "environment" } } // Изисква задната камера
-        };
+    const plasticInfo = {
+        1: "PET: Бутилки. Рециклирай!",
+        2: "HDPE: Шампоани. Безопасна.",
+        3: "PVC: ОПАСНА! Не за храна.",
+        4: "LDPE: Торбички. Рециклирай.",
+        5: "PP: Кутии за храна. Безопасна.",
+        6: "PS: Стиропор. Избягвай.",
+        7: "OTHER: Смесена пластмаса.",
+        '?': "Липсва код. Внимавай!"
+    };
 
+    // Стартиране на камерата
+    async function startApp() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: { ideal: "environment" } } 
+            });
             video.srcObject = stream;
-            // Важни атрибути за iOS/Safari:
             video.setAttribute("playsinline", true);
             video.play();
         } catch (err) {
-            alert("Грешка при достъп до камерата. Моля, проверете настройките на браузъра.");
+            alert("Камерата е блокирана. Моля, разрешете я в настройките.");
+        }
+        updateDisplay();
+    }
+
+    function handleScan(code) {
+        // 1. Снимка
+        const ctx = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+        const img = canvas.toDataURL('image/png');
+
+        // 2. Точки
+        let points = parseInt(localStorage.getItem('eco_pts') || "0") + 10;
+        localStorage.setItem('eco_pts', points);
+
+        // 3. Резултат
+        const res = document.getElementById('result');
+        res.style.display = "block";
+        res.innerHTML = `<strong>Код ${code}</strong>: ${plasticInfo[code]}`;
+
+        // 4. История
+        let logs = JSON.parse(localStorage.getItem('eco_logs') || "[]");
+        logs.unshift({ name: code, img: img, time: new Date().toLocaleTimeString() });
+        localStorage.setItem('eco_logs', JSON.stringify(logs.slice(0, 5)));
+
+        updateDisplay();
+    }
+
+    function updateDisplay() {
+        const pts = parseInt(localStorage.getItem('eco_pts') || "0");
+        document.getElementById('total-points').innerText = pts;
+        
+        let rank = "Еко Начинаещ";
+        if(pts >= 50) rank = "Пазител";
+        if(pts >= 150) rank = "Еко Герой 🏆";
+        document.getElementById('user-rank').innerText = rank;
+
+        const logs = JSON.parse(localStorage.getItem('eco_logs') || "[]");
+        document.getElementById('history-list').innerHTML = logs.map(l => `
+            <div class="history-item">
+                <img src="${l.img}">
+                <div><strong>Пластмаса №${l.name}</strong><br><small>${l.time}</small></div>
+            </div>
+        `).join('');
+    }
+
+    function openMap() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(p => {
+                window.open(`https://www.google.com/maps/search/recycling+center/@${p.coords.latitude},${p.coords.longitude},14z`);
+            }, () => {
+                window.open('https://www.google.com/maps/search/контейнери+за+рециклиране');
+            });
         }
     }
 
-    const data = {
-        1: "PET (Бутилки за вода) - Рециклирай!",
-        2: "HDPE (Препарати) - Безопасна.",
-        3: "PVC (Вредна!) - Не използвай за храна.",
-        4: "LDPE (Торбички) - Рециклирай.",
-        5: "PP (Кутии за храна) - Безопасна.",
-        6: "PS (Стиропор) - Избягвай.",
-        7: "OTHER (Смесена) - Рядко се рециклира.",
-        '?': "Липсва код - Бъди внимателен."
-    };
-
-    function check(code) {
-        const res = document.getElementById('result');
-        res.style.display = "block";
-        res.innerHTML = `<strong>Код ${code}:</strong> ${data[code]}`;
-    }
-
-    window.onload = initCamera;
+    window.onload = startApp;
 </script>
-
 </body>
 </html>
