@@ -3,49 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ZeroPlastic - Crystal Focus</title>
+    <title>ZeroPlastic - Ultimate Focus</title>
     <script src="https://unpkg.com/@zxing/library@latest"></script>
     <style>
         :root { --green: #2ecc71; --dark: #1a202c; }
-        body { font-family: sans-serif; background: var(--dark); color: white; margin: 0; padding: 10px; text-align: center; overflow: hidden; }
+        body { font-family: sans-serif; background: var(--dark); color: white; margin: 0; padding: 10px; text-align: center; }
         .container { max-width: 450px; margin: auto; }
         
-        /* Видео без зуум за максимална острота */
         #video-container { 
-            position: relative; width: 100%; height: 380px; border-radius: 20px; 
+            position: relative; width: 100%; height: 350px; border-radius: 20px; 
             overflow: hidden; border: 3px solid var(--green); background: #000;
+            touch-action: none;
         }
         video { width: 100%; height: 100%; object-fit: cover; }
         
-        /* Тънка рамка за насочване */
+        /* Рамка за прицелване */
         .guide-box {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 260px; height: 160px; border: 2px solid rgba(255,255,255,0.5);
-            border-radius: 10px; box-shadow: 0 0 0 1000px rgba(0,0,0,0.4);
+            width: 240px; height: 140px; border: 2px solid #fff;
+            border-radius: 10px; box-shadow: 0 0 0 1000px rgba(0,0,0,0.5);
         }
-        .line { position: absolute; width: 100%; height: 2px; background: #00ff00; top: 50%; animation: scan 2s infinite; }
+        .laser { position: absolute; width: 100%; height: 2px; background: #00ff00; top: 50%; animation: scan 2s infinite; }
         @keyframes scan { 0%, 100% { top: 10%; } 50% { top: 90%; } }
 
         .controls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 15px 0; }
-        .btn { padding: 12px 0; border: none; border-radius: 12px; background: var(--green); color: white; font-weight: bold; font-size: 1.2rem; cursor: pointer; }
-        
-        #msg { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: white; color: black; padding: 15px; border-radius: 15px; display: none; width: 85%; z-index: 10; }
+        .btn { padding: 15px 0; border: none; border-radius: 12px; background: var(--green); color: white; font-weight: bold; font-size: 1.2rem; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div style="display:flex; justify-content:space-between; padding:10px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:10px;">
         <div style="font-size:1.5rem;">🌟 <span id="pts">0</span></div>
-        <button onclick="toggleFlash()" style="background:none; border:1px solid #fff; color:#fff; border-radius:50%; width:40px; height:40px;">🔦</button>
+        <button onclick="toggleFlash()" style="background:#4a5568; border:none; color:#fff; border-radius:10px; padding:10px 15px;">ФЕНЕР 🔦</button>
     </div>
 
-    <div id="video-container" onclick="requestManualFocus()">
-        <video id="video"></video>
-        <div class="guide-box"><div class="line"></div></div>
+    <div id="video-container" onclick="forceFocus()">
+        <video id="video" playsinline></video>
+        <div class="guide-box"><div class="laser"></div></div>
     </div>
 
-    <p style="font-size:0.8rem; color:#a0aec0; margin:10px 0;">Докосни камерата, ако е размазано!</p>
+    <p style="font-size:0.9rem; color:#cbd5e0; margin:10px 0;">👇 Докосни екрана, за да фокусираш!</p>
 
     <div class="controls">
         <button class="btn" onclick="tap(1)">1</button>
@@ -59,11 +57,6 @@
     </div>
 </div>
 
-<div id="msg">
-    <b id="msg-t"></b><br><span id="msg-b"></span><br>
-    <button onclick="this.parentElement.style.display='none'" style="margin-top:10px; width:100%; padding:8px; border-radius:5px; border:none; background:#eee;">OK</button>
-</div>
-
 <script>
     const codeReader = new ZXing.BrowserMultiFormatReader();
     const video = document.getElementById('video');
@@ -74,47 +67,54 @@
             const constraints = {
                 video: { 
                     facingMode: "environment",
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 },
-                    focusMode: "continuous"
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
                 }
             };
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
             video.srcObject = stream;
             videoTrack = stream.getVideoTracks()[0];
 
+            // Стартиране на скенера
             codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
                 if (result) {
-                    beep();
-                    pop("Баркод сканиран!", "Браво! Продуктът е в базата. Сега избери номера от триъгълника за 10 бонус точки.");
+                    vibrate();
+                    alert("Баркодът е разчетен успешно! Погледни триъгълника за бонус.");
                     add(5);
                 }
             });
-        } catch (e) { console.error(e); }
+
+            // Опит за активиране на автофокус режим
+            forceFocus();
+
+        } catch (e) { alert("Грешка с камерата: " + e); }
     }
 
-    function requestManualFocus() {
+    function forceFocus() {
         if (videoTrack && videoTrack.applyConstraints) {
-            videoTrack.applyConstraints({ advanced: [{ focusMode: "continuous" }] })
-                .catch(e => console.log("Focus not supported"));
+            const constraints = {
+                advanced: [
+                    { focusMode: "continuous" },
+                    { focusDistance: 0.1 } // Опит за Macro фокус
+                ]
+            };
+            videoTrack.applyConstraints(constraints).catch(e => console.log("Focus mode not supported"));
+        }
+    }
+
+    function toggleFlash() {
+        if (videoTrack) {
+            const settings = videoTrack.getSettings();
+            videoTrack.applyConstraints({
+                advanced: [{ torch: !settings.torch }]
+            });
         }
     }
 
     function tap(c) {
-        beep();
-        const info = {
-            1: "PET: Рециклирай!", 2: "HDPE: Безопасно.", 3: "PVC: Вредно!",
-            4: "LDPE: Торбички.", 5: "PP: Безопасно.", 6: "PS: Стиропор.",
-            7: "OTHER: Смесена.", '?': "Непознато."
-        };
-        pop("Код " + c, info[c]);
+        vibrate();
         add(10);
-    }
-
-    function pop(t, b) {
-        document.getElementById('msg-t').innerText = t;
-        document.getElementById('msg-b').innerText = b;
-        document.getElementById('msg').style.display = 'block';
+        alert("Код " + c + " записан. Получаваш 10 точки!");
     }
 
     function add(n) {
@@ -123,20 +123,8 @@
         document.getElementById('pts').innerText = p;
     }
 
-    function beep() {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-        const o = ctx.createOscillator();
-        o.connect(ctx.destination);
-        o.start(); o.stop(ctx.currentTime + 0.1);
-    }
-
-    function toggleFlash() {
-        if (videoTrack) {
-            const caps = videoTrack.getCapabilities();
-            if (caps.torch) {
-                videoTrack.applyConstraints({ advanced: [{ torch: !videoTrack.getSettings().torch }] });
-            }
-        }
+    function vibrate() {
+        if (navigator.vibrate) navigator.vibrate(100);
     }
 
     window.onload = init;
