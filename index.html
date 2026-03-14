@@ -1,84 +1,133 @@
 <!DOCTYPE html>
 <html lang="bg">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ZeroPlastic – Macro Pro</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ZeroPlastic Pro - Fixed</title>
+    <script src="https://unpkg.com/@zxing/library@latest"></script>
+    <style>
+        :root { --green: #2ecc71; --dark: #1a202c; --gold: #f1c40f; }
+        body { font-family: sans-serif; background: var(--dark); color: white; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        /* ГОРЕН ПАНЕЛ - Фиксиран */
+        .header { background: #2d3748; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 20; }
+        .map-btn { display: block; width: 100%; background: var(--gold); color: black; text-align: center; padding: 12px; border-radius: 10px; text-decoration: none; font-weight: bold; margin-bottom: 10px; box-sizing: border-box; }
+        .score-row { display: flex; justify-content: space-between; align-items: center; font-size: 1.4rem; font-weight: bold; }
 
-<script src="https://unpkg.com/@zxing/library@latest"></script>
+        /* КАМЕРА */
+        #video-container { position: relative; flex-grow: 1; background: #000; overflow: hidden; border-bottom: 2px solid var(--green); }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        
+        /* РАМКА ЗА СКАНЕРА - Широка за баркодове */
+        .target-box { 
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 280px; height: 140px; border: 3px solid var(--green); border-radius: 15px;
+            box-shadow: 0 0 0 1000px rgba(0,0,0,0.6); pointer-events: none;
+        }
+        .laser { position: absolute; width: 100%; height: 2px; background: #ff0000; top: 0; animation: scan 2s infinite linear; box-shadow: 0 0 8px #ff0000; }
+        @keyframes scan { 0% { top: 10%; } 50% { top: 90%; } 100% { top: 10%; } }
 
-<style>
-:root{
---green:#2ecc71;
---dark:#1a202c;
---gold:#f1c40f;
-}
+        /* БУТОНИ ДОЛУ */
+        .footer { padding: 15px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; background: #2d3748; z-index: 20; }
+        .num-btn { background: var(--green); border: none; color: white; padding: 15px 0; border-radius: 10px; font-weight: bold; font-size: 1.2rem; cursor: pointer; }
+        .num-btn:active { transform: scale(0.9); background: #27ae60; }
 
-body{
-font-family:sans-serif;
-background:var(--dark);
-color:white;
-margin:0;
-display:flex;
-flex-direction:column;
-height:100vh;
-overflow:hidden;
-}
+        /* СЪОБЩЕНИЕ */
+        #msg-popup { position: fixed; top: 20%; left: 50%; transform: translateX(-50%); background: white; color: black; padding: 15px 25px; border-radius: 30px; font-weight: bold; display: none; z-index: 100; box-shadow: 0 5px 20px rgba(0,0,0,0.5); text-align: center; }
+    </style>
+</head>
+<body>
 
-/* HEADER */
+<div id="msg-popup"></div>
 
-.header{
-background:#2d3748;
-padding:15px;
-box-shadow:0 4px 10px rgba(0,0,0,0.3);
-z-index:10;
-}
+<div class="header">
+    <a href="https://www.google.com/maps/search/recycling+center" target="_blank" class="map-btn">📍 НАМЕРИ ПУНКТ ЗА РЕЦИКЛИРАНЕ</a>
+    <div class="score-row">
+        <div>🌟 <span id="points">0</span></div>
+        <button onclick="toggleFlash()" style="background:#4a5568; border:none; color:white; padding:8px 15px; border-radius:8px;">ФЕНЕР 🔦</button>
+    </div>
+</div>
 
-.map-btn{
-display:block;
-width:100%;
-background:var(--gold);
-color:black;
-text-align:center;
-padding:12px;
-border-radius:10px;
-text-decoration:none;
-font-weight:bold;
-margin-bottom:10px;
-}
+<div id="video-container" onclick="manualFocus()">
+    <video id="video" playsinline></video>
+    <div class="target-box"><div class="laser"></div></div>
+    <div style="position:absolute; bottom:10px; width:100%; text-align:center; font-size:0.7rem; opacity:0.7;">Докосни тук за фокус</div>
+</div>
 
-.score-row{
-display:flex;
-justify-content:space-between;
-align-items:center;
-font-size:1.4rem;
-font-weight:bold;
-}
+<div class="footer">
+    <button class="num-btn" onclick="addPoints(10, 'Тип 1')">1</button>
+    <button class="num-btn" onclick="addPoints(10, 'Тип 2')">2</button>
+    <button class="num-btn" onclick="addPoints(10, 'Тип 3')">3</button>
+    <button class="num-btn" onclick="addPoints(10, 'Тип 4')">4</button>
+    <button class="num-btn" onclick="addPoints(10, 'Тип 5')">5</button>
+    <button class="num-btn" onclick="addPoints(10, 'Тип 6')">6</button>
+    <button class="num-btn" onclick="addPoints(10, 'Тип 7')">7</button>
+    <button class="num-btn" style="background:#4a5568" onclick="addPoints(5, 'Неясно')">?</button>
+</div>
 
-/* CAMERA */
+<script>
+    const codeReader = new ZXing.BrowserMultiFormatReader();
+    let videoTrack = null;
+    let isLocked = false;
 
-#video-container{
-position:relative;
-flex-grow:1;
-background:#000;
-overflow:hidden;
-}
+    async function start() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "environment", width: { ideal: 1280 } } 
+            });
+            videoTrack = stream.getVideoTracks()[0];
+            document.getElementById('video').srcObject = stream;
 
-video{
-width:100%;
-height:100%;
-object-fit:cover;
-}
+            codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
+                if (result && !isLocked) {
+                    isLocked = true;
+                    notify("Баркод сканиран! +5 точки", 5);
+                    setTimeout(() => { isLocked = false; }, 4000); // 4 сек. пауза против трупане
+                }
+            });
+        } catch (e) { console.error(e); }
+        updateUI();
+    }
 
-/* SCAN ZONE */
+    function addPoints(p, label) {
+        if (isLocked) return;
+        isLocked = true;
+        notify(label + " записан! +10 точки", p);
+        setTimeout(() => { isLocked = false; }, 2000);
+    }
 
-.target-box{
-position:absolute;
-top:50%;
-left:50%;
-transform:translate(-50%,-50%);
-width:320px;
-height:120px;
-border:3px solid var(--green);
-border-radius:15px;
-box-sha
+    function notify(text, p) {
+        // Точки
+        let total = parseInt(localStorage.getItem('eco_score') || "0") + p;
+        localStorage.setItem('eco_score', total);
+        updateUI();
+
+        // Попъп
+        const pop = document.getElementById('msg-popup');
+        pop.innerText = text;
+        pop.style.display = 'block';
+        if (navigator.vibrate) navigator.vibrate(100);
+        setTimeout(() => { pop.style.display = 'none'; }, 2500);
+    }
+
+    function updateUI() {
+        document.getElementById('points').innerText = localStorage.getItem('eco_score') || "0";
+    }
+
+    function toggleFlash() {
+        if (videoTrack && videoTrack.getCapabilities().torch) {
+            const current = videoTrack.getSettings().torch;
+            videoTrack.applyConstraints({ advanced: [{ torch: !current }] });
+        }
+    }
+
+    function manualFocus() {
+        if (videoTrack && videoTrack.applyConstraints) {
+            videoTrack.applyConstraints({ advanced: [{ focusMode: "continuous" }] }).catch(() => {});
+        }
+    }
+
+    window.onload = start;
+</script>
+</body>
+</html>
