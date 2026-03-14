@@ -1,143 +1,84 @@
 <!DOCTYPE html>
 <html lang="bg">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ZeroPlastic - Macro Pro</title>
-    <script src="https://unpkg.com/@zxing/library@latest"></script>
-    <style>
-        :root { --green: #2ecc71; --dark: #1a202c; --gold: #f1c40f; }
-        body { font-family: sans-serif; background: var(--dark); color: white; margin: 0; padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        
-        /* Фиксиран панел горе */
-        .header { background: #2d3748; padding: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); z-index: 10; }
-        .map-btn { display: block; width: 100%; background: var(--gold); color: black; text-align: center; padding: 12px; border-radius: 10px; text-decoration: none; font-weight: bold; margin-bottom: 10px; }
-        .score-row { display: flex; justify-content: space-between; align-items: center; font-size: 1.4rem; font-weight: bold; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZeroPlastic – Macro Pro</title>
 
-        /* Камера */
-        #video-container { position: relative; flex-grow: 1; background: #000; overflow: hidden; }
-        video { width: 100%; height: 100%; object-fit: cover; }
-        .target-box { 
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 240px; height: 140px; border: 2px solid var(--green); border-radius: 15px;
-            box-shadow: 0 0 0 1000px rgba(0,0,0,0.5); pointer-events: none;
-        }
-        .laser { position: absolute; width: 100%; height: 2px; background: #ff0000; top: 0; animation: scan 2s infinite linear; }
-        @keyframes scan { 0% { top: 0%; } 100% { top: 100%; } }
+<script src="https://unpkg.com/@zxing/library@latest"></script>
 
-        /* Бутони долу */
-        .footer { padding: 15px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; background: #2d3748; }
-        .num-btn { background: var(--green); border: none; color: white; padding: 15px 0; border-radius: 10px; font-weight: bold; font-size: 1.2rem; cursor: pointer; }
-        .num-btn:disabled { background: #4a5568; opacity: 0.5; }
+<style>
+:root{
+--green:#2ecc71;
+--dark:#1a202c;
+--gold:#f1c40f;
+}
 
-        #alert { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: white; color: black; padding: 10px 20px; border-radius: 20px; font-weight: bold; display: none; z-index: 100; }
-    </style>
-</head>
-<body>
+body{
+font-family:sans-serif;
+background:var(--dark);
+color:white;
+margin:0;
+display:flex;
+flex-direction:column;
+height:100vh;
+overflow:hidden;
+}
 
-<div class="header">
-    <a href="https://www.google.com/maps/search/recycling+center" target="_blank" class="map-btn">📍 НАМЕРИ ПУНКТ ЗА РЕЦИКЛИРАНЕ</a>
-    <div class="score-row">
-        <div>🌟 <span id="score">0</span></div>
-        <button onclick="toggleTorch()" style="background:#4a5568; border:none; color:white; padding:8px 15px; border-radius:8px; font-size:0.9rem;">ФЕНЕР 🔦</button>
-    </div>
-</div>
+/* HEADER */
 
-<div id="video-container" onclick="requestMacroFocus()">
-    <video id="video" playsinline></video>
-    <div class="target-box"><div class="laser"></div></div>
-    <div style="position:absolute; bottom:10px; width:100%; text-align:center; font-size:0.8rem; color:#ccc;">Докосни екрана за фокус</div>
-</div>
+.header{
+background:#2d3748;
+padding:15px;
+box-shadow:0 4px 10px rgba(0,0,0,0.3);
+z-index:10;
+}
 
-<div class="footer">
-    <button class="num-btn" onclick="logManual(1)">1</button>
-    <button class="num-btn" onclick="logManual(2)">2</button>
-    <button class="num-btn" onclick="logManual(3)">3</button>
-    <button class="num-btn" onclick="logManual(4)">4</button>
-    <button class="num-btn" onclick="logManual(5)">5</button>
-    <button class="num-btn" onclick="logManual(6)">6</button>
-    <button class="num-btn" onclick="logManual(7)">7</button>
-    <button class="num-btn" style="background:#4a5568" onclick="logManual('?')">?</button>
-</div>
+.map-btn{
+display:block;
+width:100%;
+background:var(--gold);
+color:black;
+text-align:center;
+padding:12px;
+border-radius:10px;
+text-decoration:none;
+font-weight:bold;
+margin-bottom:10px;
+}
 
-<div id="alert"></div>
+.score-row{
+display:flex;
+justify-content:space-between;
+align-items:center;
+font-size:1.4rem;
+font-weight:bold;
+}
 
-<script>
-    const codeReader = new ZXing.BrowserMultiFormatReader();
-    let videoTrack = null;
-    let isProcessing = false;
+/* CAMERA */
 
-    async function init() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } 
-            });
-            const v = document.getElementById('video');
-            v.srcObject = stream;
-            videoTrack = stream.getVideoTracks()[0];
+#video-container{
+position:relative;
+flex-grow:1;
+background:#000;
+overflow:hidden;
+}
 
-            codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
-                if (result && !isProcessing) {
-                    handleAction("Баркодът е сканиран!", 5);
-                }
-            });
-        } catch (e) {
-            console.error(e);
-            alert("Моля, разрешете достъп до камерата.");
-        }
-        updateUI();
-    }
+video{
+width:100%;
+height:100%;
+object-fit:cover;
+}
 
-    // ВАЖНО: Команда за принудителен фокус на телефона
-    async function requestMacroFocus() {
-        if (videoTrack && videoTrack.applyConstraints) {
-            try {
-                await videoTrack.applyConstraints({
-                    advanced: [{ focusMode: "continuous" }, { pointsOfInterest: [{ x: 0.5, y: 0.5 }] }]
-                });
-            } catch (e) { console.log("Focus not supported"); }
-        }
-    }
+/* SCAN ZONE */
 
-    function logManual(num) {
-        if (isProcessing) return;
-        handleAction("Записана пластмаса №" + num, 10);
-    }
-
-    function handleAction(msg, pts) {
-        isProcessing = true;
-        
-        // Точки
-        let s = parseInt(localStorage.getItem('eco_pts') || "0") + pts;
-        localStorage.setItem('eco_pts', s);
-        updateUI();
-
-        // Известие
-        const a = document.getElementById('alert');
-        a.innerText = msg;
-        a.style.display = 'block';
-
-        // Вибрация и звук
-        if (navigator.vibrate) navigator.vibrate(150);
-
-        // Блокировка за 3 секунди против трупане на точки
-        setTimeout(() => {
-            a.style.display = 'none';
-            isProcessing = false;
-        }, 3000);
-    }
-
-    function updateUI() {
-        document.getElementById('score').innerText = localStorage.getItem('eco_pts') || "0";
-    }
-
-    function toggleTorch() {
-        if (videoTrack && videoTrack.getCapabilities().torch) {
-            videoTrack.applyConstraints({ advanced: [{ torch: !videoTrack.getSettings().torch }] });
-        }
-    }
-
-    window.onload = init;
-</script>
-</body>
-</html>
+.target-box{
+position:absolute;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+width:320px;
+height:120px;
+border:3px solid var(--green);
+border-radius:15px;
+box-sha
